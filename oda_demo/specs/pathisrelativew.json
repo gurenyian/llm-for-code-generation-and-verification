@@ -1,0 +1,18 @@
+{
+  "function": "PathIsRelativeW",
+  "signature": "BOOL PathIsRelativeW(const uint16_t* path)",
+  "return_domain": [0, 1],
+  "summaries": [
+    {
+      "when": "ret == 0",
+      "assume_c_expr": "(path[0] == '\\\\') || ((path[0] != 0) && (path[1] == ':'))",
+      "note": "非相对路径：以反斜杠开头或形如 C:..."
+    },
+    {
+      "when": "ret == 1",
+      "assume_c_expr": "(path[0] == 0) || ((path[0] != '\\\\') && (path[1] != ':'))",
+      "note": "相对路径或空字符串"
+    }
+  ]
+}
+
