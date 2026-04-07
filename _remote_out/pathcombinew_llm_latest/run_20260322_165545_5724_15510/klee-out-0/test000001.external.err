@@ -1,0 +1,8 @@
+Error: failed external call: PathCanonicalizeW
+File: harness_pathcombinew.c
+Line: 83
+assembly.ll line: 201
+State: 2
+Stack: 
+	#000000201 in PathCombineW(135822315618304, 135820168134656, 135818020651008) at harness_pathcombinew.c:83
+	#100000278 in main() at harness_pathcombinew.c:107

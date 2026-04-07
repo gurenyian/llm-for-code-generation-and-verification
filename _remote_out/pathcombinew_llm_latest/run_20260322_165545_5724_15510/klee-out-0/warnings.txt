@@ -1,0 +1,5 @@
+KLEE: WARNING: undefined reference to function: PathCanonicalizeW
+KLEE: WARNING: undefined reference to function: lstrcatW
+KLEE: WARNING: undefined reference to function: myPathAddBackslashW
+KLEE: WARNING ONCE: calling external: PathCanonicalizeW(135822315618304, 135816946909184) at harness_pathcombinew.c:84 5
+KLEE: WARNING ONCE: calling external: myPathAddBackslashW(135816946909184) at harness_pathcombinew.c:74 14

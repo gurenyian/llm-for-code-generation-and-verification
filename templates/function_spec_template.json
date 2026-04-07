@@ -1,0 +1,53 @@
+{
+  "schema": "oda.function_spec.v1",
+  "target_function": "TARGET_FUNCTION_NAME",
+  "signature": "RETURN_TYPE WINAPI TARGET_FUNCTION_NAME(ARG0, ARG1, ...)",
+  "target_dll": "TARGET_DLL",
+  "target_file": "TARGET_FILE",
+  "description": "Short description of what the target function does.",
+  "symbolic_inputs": [
+    {
+      "name": "arg_name",
+      "type": "WCHAR[MAX_PATH] | WCHAR* | int | BOOL | pointer",
+      "init": "how to initialize before symbolic execution",
+      "assumptions": [
+        "boundary/format assumptions for KLEE"
+      ]
+    }
+  ],
+  "coverage_goal": {
+    "path_mode": "feasible_paths",
+    "acceptance": [
+      "missing_predicate_dependencies is empty",
+      "target function Icov == I",
+      "Iuncov == 0",
+      "Completed paths stable across reruns"
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "DEPENDENCY_NAME",
+      "signature": "FUNCTION_SIGNATURE",
+      "source_hint": "dll/file path or summary",
+      "abstraction": {
+        "type": "symbolic_return | symbolic_output | noop",
+        "reason": "Why this abstraction was selected.",
+        "constraints": [
+          "C code lines or constraint bullets that guide stub generation"
+        ]
+      }
+    }
+  ],
+  "target_predicates": [
+    {
+      "condition": "branch condition text",
+      "depends_on": ["optional dependency names"],
+      "boundary_notes": "what boundary values must be reachable"
+    }
+  ],
+  "llm_feedback": {
+    "missing_predicate_dependencies": [],
+    "klee_warnings": [],
+    "rebuild_stub": false
+  }
+}

@@ -1,0 +1,8 @@
+Error: failed external call: myPathAddBackslashW
+File: harness_pathcombinew.c
+Line: 74
+assembly.ll line: 181
+State: 13
+Stack: 
+	#000000181 in PathCombineW(135822315618304, 135820168134656, 135818020651008) at harness_pathcombinew.c:74
+	#100000278 in main() at harness_pathcombinew.c:107

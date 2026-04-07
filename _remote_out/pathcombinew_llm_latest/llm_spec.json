@@ -1,0 +1,145 @@
+{
+  "target_function": "PathCombineW",
+  "description": "Combines two path strings into a single path.",
+  "dependencies": [
+    {
+      "name": "PathAddBackslashW",
+      "signature": "BOOL WINAPI PathAddBackslashW(WCHAR *path)",
+      "description": "Adds a backslash to the end of the path if necessary.",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "The return value affects control flow in PathCombineW.",
+        "constraints": [
+          "if (path == NULL) return FALSE;",
+          "BOOL ret;",
+          "klee_make_symbolic(&ret, sizeof(ret), \"PathAddBackslashW_ret\");",
+          "klee_assume(ret == 0 || ret == 1);",
+          "klee_assume(ret == 1 || (path[0] != '\\' && path[0] != 0));"
+        ]
+      }
+    },
+    {
+      "name": "lstrlenW",
+      "signature": "INT WINAPI lstrlenW(LPCWSTR str)",
+      "description": "Returns the length of a wide string.",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "The return value is used in a condition to check path length.",
+        "constraints": [
+          "if (str == NULL) return 0;",
+          "int len;",
+          "klee_make_symbolic(&len, sizeof(len), \"lstrlenW_ret\");",
+          "klee_assume(len >= 0 && len <= 260);",
+          "if (len > 0) klee_assume(str[0] != 0);"
+        ]
+      }
+    },
+    {
+      "name": "PathIsRelativeW",
+      "signature": "BOOL WINAPI PathIsRelativeW(const WCHAR *path)",
+      "description": "Determines if a path is relative.",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "The return value is used in a condition to determine path handling.",
+        "constraints": [
+          "if (path == NULL) return FALSE;",
+          "BOOL ret;",
+          "klee_make_symbolic(&ret, sizeof(ret), \"PathIsRelativeW_ret\");",
+          "klee_assume(ret == 0 || ret == 1);"
+        ]
+      }
+    },
+    {
+      "name": "PathIsUNCW",
+      "signature": "BOOL WINAPI PathIsUNCW(const WCHAR *path)",
+      "description": "Determines if a path is a UNC path.",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "The return value is used in a condition to determine path handling.",
+        "constraints": [
+          "if (path == NULL) return FALSE;",
+          "BOOL ret;",
+          "klee_make_symbolic(&ret, sizeof(ret), \"PathIsUNCW_ret\");",
+          "klee_assume(ret == 0 || ret == 1);"
+        ]
+      }
+    },
+    {
+      "name": "PathStripToRootW",
+      "signature": "BOOL WINAPI PathStripToRootW(WCHAR *path)",
+      "description": "Strips the path to its root.",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "The return value is used in a condition to determine path handling.",
+        "constraints": [
+          "if (path == NULL) return FALSE;",
+          "BOOL ret;",
+          "klee_make_symbolic(&ret, sizeof(ret), \"PathStripToRootW_ret\");",
+          "klee_assume(ret == 0 || ret == 1);"
+        ]
+      }
+    },
+    {
+      "name": "KERNELBASE_lstrcpynW",
+      "signature": "LPWSTR WINAPI KERNELBASE_lstrcpynW(LPWSTR dst, LPCWSTR src, INT n)",
+      "description": "Copies a specified number of characters from one string to another.",
+      "abstraction": {
+        "type": "noop",
+        "reason": "The return value does not affect control flow.",
+        "constraints": [
+          "if (dst == NULL || src == NULL) return dst;"
+        ]
+      }
+    },
+    {
+      "name": "KERNELBASE_lstrlenW",
+      "signature": "INT WINAPI KERNELBASE_lstrlenW(LPCWSTR str)",
+      "description": "Returns the length of a wide string.",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "The return value is used in a condition to check path length.",
+        "constraints": [
+          "if (str == NULL) return 0;",
+          "int len;",
+          "klee_make_symbolic(&len, sizeof(len), \"KERNELBASE_lstrlenW_ret\");",
+          "klee_assume(len >= 0 && len <= 260);",
+          "if (len > 0) klee_assume(str[0] != 0);"
+        ]
+      }
+    }
+  ],
+  "target_predicates": [
+    {
+      "description": "Check if destination pointer is NULL.",
+      "condition": "!dst"
+    },
+    {
+      "description": "Check if both dir and file are NULL.",
+      "condition": "!dir && !file"
+    },
+    {
+      "description": "Check if file is empty and dir is not NULL.",
+      "condition": "(!file || !*file) && dir"
+    },
+    {
+      "description": "Check if dir is NULL or empty or if file is not relative.",
+      "condition": "!dir || !*dir || !PathIsRelativeW(file)"
+    },
+    {
+      "description": "Check if dir is NULL or empty or if file does not start with '\\' or is UNC.",
+      "condition": "!dir || !*dir || *file != '\\\\' || PathIsUNCW(file)"
+    },
+    {
+      "description": "Check if use_both is true.",
+      "condition": "use_both"
+    },
+    {
+      "description": "Check if strip is true.",
+      "condition": "strip"
+    },
+    {
+      "description": "Check if PathAddBackslashW fails or if combined length exceeds MAX_PATH.",
+      "condition": "!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH"
+    }
+  ]
+}

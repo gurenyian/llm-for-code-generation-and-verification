@@ -1,0 +1,11 @@
+{
+  "target_function": "PathIsRelativeW",
+  "description": "Fallback spec for PathIsRelativeW (LLM failed)",
+  "dependencies": [],
+  "target_predicates": [
+    {
+      "description": "predicate",
+      "condition": "!path || !*path"
+    }
+  ]
+}

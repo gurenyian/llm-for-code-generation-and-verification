@@ -1,0 +1,68 @@
+{
+  "target_function": "PathCombineW",
+  "dependencies": [
+    {
+      "function": "ARRAY_SIZE",
+      "strategy": "No-op",
+      "reasoning": "ARRAY_SIZE 是一个宏，用于计算数组的大小，不影响程序逻辑。",
+      "stub_code": "#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))",
+      "name": "ARRAY_SIZE"
+    },
+    {
+      "function": "PathAddBackslashW",
+      "strategy": "Semantic_Binding",
+      "reasoning": "PathAddBackslashW 的返回值直接影响后续逻辑，决定是否添加反斜杠。",
+      "stub_code": "LPWSTR WINAPI PathAddBackslashW(WCHAR *path) {\n  int ret = klee_make_symbolic_int(\"oda_PathAddBackslashW_ret\");\n  klee_assume(ret == 0 || ret == 1);\n  klee_assume(path != NULL);\n  if (ret) {\n    klee_assume(path[wcslen(path)] == '\\\\');\n  } else {\n    klee_assume(path[wcslen(path)] != '\\\\');\n  }\n  return path;\n}",
+      "name": "PathAddBackslashW"
+    },
+    {
+      "function": "PathCanonicalizeW",
+      "strategy": "Semantic_Binding",
+      "reasoning": "PathCanonicalizeW 的返回值直接影响函数的成功与否，需进行语义绑定。",
+      "stub_code": "BOOL WINAPI PathCanonicalizeW(WCHAR *buffer, const WCHAR *path) {\n  int ret = klee_make_symbolic_int(\"oda_PathCanonicalizeW_ret\");\n  klee_assume(ret == 0 || ret == 1);\n  klee_assume(buffer != NULL);\n  klee_assume(path != NULL);\n  if (ret) {\n    // 假设 buffer 被正确填充\n  } else {\n    klee_assume(!(path));\n  }\n  return ret;\n}",
+      "name": "PathCanonicalizeW"
+    },
+    {
+      "function": "PathIsRelativeW",
+      "strategy": "Semantic_Binding",
+      "reasoning": "PathIsRelativeW 的返回值用于判断路径类型，直接影响控制流。",
+      "stub_code": "BOOL WINAPI PathIsRelativeW(const WCHAR *path) {\n  int ret = klee_make_symbolic_int(\"oda_PathIsRelativeW_ret\");\n  klee_assume(ret == 0 || ret == 1);\n  klee_assume(path != NULL);\n  if (ret) {\n    klee_assume(path[0] != '\\\\');\n  } else {\n    klee_assume(path[0] == '\\\\');\n  }\n  return ret;\n}",
+      "name": "PathIsRelativeW"
+    },
+    {
+      "function": "PathIsUNCW",
+      "strategy": "Semantic_Binding",
+      "reasoning": "PathIsUNCW 的返回值用于判断路径是否为 UNC 路径，影响后续逻辑。",
+      "stub_code": "BOOL WINAPI PathIsUNCW(const WCHAR *path) {\n  int ret = klee_make_symbolic_int(\"oda_PathIsUNCW_ret\");\n  klee_assume(ret == 0 || ret == 1);\n  klee_assume(path != NULL);\n  if (ret) {\n    klee_assume(path[0] == '\\\\' && path[1] == '\\\\');\n  } else {\n    klee_assume(!(path[0] == '\\\\' && path[1] == '\\\\'));\n  }\n  return ret;\n}",
+      "name": "PathIsUNCW"
+    },
+    {
+      "function": "PathStripToRootW",
+      "strategy": "Semantic_Binding",
+      "reasoning": "PathStripToRootW 的返回值影响路径的处理逻辑，需进行语义绑定。",
+      "stub_code": "BOOL WINAPI PathStripToRootW(WCHAR *path) {\n  int ret = klee_make_symbolic_int(\"oda_PathStripToRootW_ret\");\n  klee_assume(ret == 0 || ret == 1);\n  klee_assume(path != NULL);\n  if (ret) {\n    // 假设 path 被正确修改为根路径\n  } else {\n    klee_assume(!(path));\n  }\n  return ret;\n}",
+      "name": "PathStripToRootW"
+    },
+    {
+      "function": "lstrcatW",
+      "strategy": "Bounded_Concrete",
+      "reasoning": "lstrcatW 是字符串连接函数，属于基础字符串操作，使用极简 C 逻辑实现。",
+      "stub_code": "LPWSTR WINAPI lstrcatW(LPWSTR dst, LPCWSTR src) {\n  if (dst == NULL || src == NULL) return NULL;\n  int i = 0;\n  while (dst[i] != '\\0' && i < 64) i++;\n  int j = 0;\n  while (src[j] != '\\0' && j < 64 && i < 64) {\n    dst[i++] = src[j++];\n  }\n  dst[i] = '\\0';\n  return dst;\n}",
+      "name": "lstrcatW"
+    },
+    {
+      "function": "KERNELBASE_lstrcpynW",
+      "strategy": "Bounded_Concrete",
+      "reasoning": "KERNELBASE_lstrcpynW 是字符串复制函数，属于基础字符串操作，使用极简 C 逻辑实现。",
+      "stub_code": "LPWSTR WINAPI KERNELBASE_lstrcpynW(LPWSTR dst, LPCWSTR src, INT n) {\n  if (dst == NULL || src == NULL) return NULL;\n  int i = 0;\n  while (src[i] != '\\0' && i < n && i < 64) {\n    dst[i] = src[i];\n    i++;\n  }\n  dst[i] = '\\0';\n  return dst;\n}",
+      "name": "KERNELBASE_lstrcpynW"
+    },
+    {
+      "function": "lstrlenW",
+      "strategy": "Bounded_Concrete",
+      "reasoning": "lstrlenW 是字符串长度计算函数，属于基础字符串操作，使用极简 C 逻辑实现。",
+      "stub_code": "int WINAPI lstrlenW(LPCWSTR str) {\n  int len = 0;\n  while (str[len] != '\\0' && len < 64) len++;\n  return len;\n}",
+      "name": "lstrlenW"
+    }
+  ]
+}

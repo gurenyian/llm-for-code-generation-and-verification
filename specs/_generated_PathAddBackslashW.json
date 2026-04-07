@@ -1,0 +1,39 @@
+{
+  "target_function": "lstrcatW",
+  "description": "Appends one string to another",
+  "dependencies": [
+    {
+      "name": "lstrlenW",
+      "signature": "int lstrlenW(LPCWSTR str)",
+      "description": "Returns the length of a wide string",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "返回值用于确定追加位置，影响控制流",
+        "constraints": [
+          "if (str == NULL) return 0;",
+          "",
+          "int len;",
+          "klee_make_symbolic(&len, sizeof(len), \"lstrlenW_ret\");",
+          "klee_assume(len >= 0 && len <= 32);",
+          "if (len > 0) klee_assume(str[0] != 0);",
+          "",
+          "return len;"
+        ]
+      }
+    }
+  ],
+  "target_predicates": [
+    {
+      "description": "Destination is NULL",
+      "condition": "dest == NULL"
+    },
+    {
+      "description": "Source is NULL",
+      "condition": "src == NULL"
+    },
+    {
+      "description": "Destination length is greater than 0",
+      "condition": "lstrlenW(dest) > 0"
+    }
+  ]
+}

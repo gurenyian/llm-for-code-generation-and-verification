@@ -1,0 +1,29 @@
+[Wine check report (filtered)]
+raw: wine_check_raw.txt (see it when debugging)
+[Filtered FAIL lines]
+filtered noise lines: 73
+
+[FAIL] /home/guren/oda_work/oda_demo/runner/test_runner.c:668: case 3: lstrcmpW(...) got=1 exp=0
+[MISMATCH] target=lstrcmpW case=3 got=1 exp=0
+[FAIL] /home/guren/oda_work/oda_demo/runner/test_runner.c:668: case 5: lstrcmpW(...) got=1 exp=0
+[MISMATCH] target=lstrcmpW case=5 got=1 exp=0
+[FAIL] /home/guren/oda_work/oda_demo/runner/test_runner.c:668: case 7: lstrcmpW(...) got=1 exp=0
+[MISMATCH] target=lstrcmpW case=7 got=1 exp=0
+[FAIL] /home/guren/oda_work/oda_demo/runner/test_runner.c:668: case 19: lstrcmpW(...) got=1 exp=0
+[MISMATCH] target=lstrcmpW case=19 got=1 exp=0
+[FAIL] /home/guren/oda_work/oda_demo/runner/test_runner.c:668: case 25: lstrcmpW(...) got=1 exp=0
+[MISMATCH] target=lstrcmpW case=25 got=1 exp=0
+[FAIL] /home/guren/oda_work/oda_demo/runner/test_runner.c:668: case 29: lstrcmpW(...) got=1 exp=0
+[MISMATCH] target=lstrcmpW case=29 got=1 exp=0
+
+[Test summary]
+========================================
+测试摘要
+========================================
+总计: 31 个测试
+通过: 25 个
+失败: 6 个
+跳过: 0 个
+========================================
+✗ 有 6 个测试失败
+

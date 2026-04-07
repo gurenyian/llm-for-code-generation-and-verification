@@ -1,0 +1,9 @@
+Error: Invalid string pointer passed to one of the klee_ functions
+File: ./oda_stubs.c
+Line: 80
+assembly.ll line: 49
+State: 12
+Stack: 
+	#000000049 in PathIsRelativeW() at ./oda_stubs.c:80
+	#100000133 in PathCombineW(138240912785408, 138238765301760, 138236617818112) at harness_pathcombinew.c:50
+	#200000224 in main() at harness_pathcombinew.c:107

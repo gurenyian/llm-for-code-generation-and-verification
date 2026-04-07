@@ -1,0 +1,746 @@
+你是一个符号执行专家。请为函数 `PathIsRelativeW` 生成 ODA（On-Demand Abstraction）规约。
+
+## 背景知识
+
+ODA 的目的是为复杂的依赖函数生成简化的 stub，使得 KLEE 可以高效地进行符号执行。
+
+### Stub 的类型
+
+1. **symbolic_return**: 符号化返回值
+   - 适用于：返回值影响控制流的函数
+   - 示例：`lstrlenW` 返回长度，用于 `if (len > 0)` 判断
+
+2. **symbolic_output**: 符号化输出参数
+   - 适用于：通过指针参数返回结果的函数
+   - 示例：`GetSystemTime` 通过指针参数返回时间
+
+3. **noop**: 空操作
+   - 适用于：返回值不影响控制流的函数
+   - 示例：日志函数、调试函数
+
+### 约束的原则
+
+1. **边界情况**：NULL 指针、空字符串、0 值等
+2. **合理范围**：返回值的最小/最大值（如字符串长度 0-260）
+3. **充分条件**：确保能触发目标函数的所有分支
+
+## 目标函数
+
+`PathIsRelativeW`
+
+## 依赖函数
+
+[]
+
+## 关键谓词（需要覆盖的分支）
+
+[
+  {
+    "condition": "!path || !*path",
+    "type": "if",
+    "line": 5,
+    "normalized_condition": "!path || !*path",
+    "symbols": [
+      "path"
+    ],
+    "ir": {
+      "kind": "or",
+      "items": [
+        {
+          "kind": "not",
+          "item": {
+            "kind": "expr",
+            "text": "path"
+          }
+        },
+        {
+          "kind": "not",
+          "item": {
+            "kind": "expr",
+            "text": "*path"
+          }
+        }
+      ]
+    }
+  }
+]
+
+## （增强）按依赖函数聚合的覆盖要点
+
+下面把结构化 ψ 按 `depends_on` 做了归并；如果某个依赖函数出现在这里，说明它的返回值/输出会影响 `PathIsRelativeW` 的分支。
+你需要为这些依赖函数生成 **能覆盖比较边界** 的约束（例如 `>= MAX_PATH` 既要可取到 `MAX_PATH-1` 也要可取到 `MAX_PATH`）。
+
+{}
+
+## 任务
+
+为每个依赖函数生成 stub，步骤：
+
+### 步骤 1: 分析影响
+
+对于每个依赖函数，判断：
+- 它的返回值是否出现在谓词中？
+- 它的返回值是否被赋值给变量，然后用于条件判断？
+- 它是否有副作用（修改全局状态、输出参数）？
+
+### 步骤 2: 选择抽象类型
+
+- 如果返回值影响控制流 → `symbolic_return`
+- 如果有输出参数 → `symbolic_output`
+- 如果都不影响 → `noop`
+
+### 步骤 3: 生成约束
+
+对于 `symbolic_return` 类型，生成约束代码（C 语言）：
+
+```c
+// 1. 处理边界情况
+if (param == NULL) return ERROR_VALUE;
+
+// 2. 创建符号变量
+TYPE ret;
+klee_make_symbolic(&ret, sizeof(ret), "function_name_ret");
+
+// 3. 添加合理范围约束
+klee_assume(ret >= MIN && ret <= MAX);
+
+// 4. 添加充分条件约束（确保能触发所有分支）
+// 例如：如果谓词是 "len > 0"，需要确保 len 可以是 0 和 >0
+if (ret > 0) klee_assume(param[0] != 0);  // 非空字符串
+
+// 5. 返回
+return ret;
+```
+
+### 步骤 4: 输出 JSON
+
+```json
+{
+  "target_function": "PathIsRelativeW",
+  "description": "函数功能描述",
+  "dependencies": [
+    {
+      "name": "函数名",
+      "signature": "函数签名",
+      "description": "函数功能",
+      "abstraction": {
+        "type": "symbolic_return | symbolic_output | noop",
+        "reason": "为什么选择这种抽象（1-2 句话）",
+        "constraints": [
+          "C 代码行 1",
+          "C 代码行 2",
+          "..."
+        ]
+      }
+    }
+  ],
+  "target_predicates": [
+    {
+      "description": "分支描述",
+      "condition": "条件表达式"
+    }
+  ]
+}
+```
+
+## 示例
+
+### 示例 1: lstrlenW
+
+**分析**：
+- 功能：返回宽字符串长度
+- 影响：返回值用于 `if (len > 0)` 判断
+- 类型：`symbolic_return`
+
+**约束**：
+```c
+if (str == NULL) return 0;
+int len;
+klee_make_symbolic(&len, sizeof(len), "lstrlenW_ret");
+klee_assume(len >= 0 && len <= 260);  // MAX_PATH
+if (len > 0) klee_assume(str[0] != 0);  // 非空字符串
+return len;
+```
+
+### 示例 2: lstrcpyW
+
+**分析**：
+- 功能：复制宽字符串
+- 影响：返回值通常不用于条件判断
+- 类型：`noop`（或简化的 `symbolic_output`）
+
+**约束**：
+```c
+if (dest == NULL || src == NULL) return dest;
+// 简化：假设复制成功
+return dest;
+```
+
+## 现在请生成完整的 ODA 规约
+
+要求：
+1. 分析每个依赖函数的影响
+2. 选择合适的抽象类型
+3. 生成精确的约束代码（必须考虑上面“按依赖聚合的覆盖要点”，并显式让比较边界可取到两侧值）
+4. 输出完整的 JSON
+
+只输出 JSON，不要有其他文字。
+
+
+[RAGEvidence]
+下面是从索引/源码召回的候选片段（可能包含目标函数或其邻近实现）。请用它们来补齐依赖与谓词，避免漏 stub：
+
+[RAGSnippet score=13.5] kernelbase/path.c::PathIsRelativeW
+```c
+BOOL WINAPI PathIsRelativeW(const WCHAR *path)
+{
+    TRACE("%s\n", wine_dbgstr_w(path));
+
+    if (!path || !*path)
+        return TRUE;
+
+    return !(*path == '\\' || (*path && path[1] == ':'));
+}
+
+BOOL WINAPI PathIsUNCServerShareA(const char *path)
+{
+    BOOL seen_slash = FALSE;
+
+    TRACE("%s\n", wine_dbgstr_a(path));
+
+    if (path && *path++ == '\\' && *path++ == '\\')
+    {
+        while (*path)
+        {
+            if (*path == '\\')
+            {
+                if (seen_slash)
+                    return FALSE;
+                seen_slash = TRUE;
+            }
+
+            path = CharNextA(path);
+        }
+    }
+
+    return seen_slash;
+}
+
+BOOL WINAPI PathIsUNCServerShareW(const WCHAR *path)
+{
+    BOOL seen_slash = FALSE;
+
+    TRACE("%s\n", wine_dbgstr_w(path));
+
+    if (path && *path++ == '\\' && *path++ == '\\')
+    {
+        while (*path)
+        {
+            if (*path == '\\')
+            {
+                if (seen_slash)
+                    return FALSE;
+                seen_slash = TRUE;
+            }
+
+            path++;
+        }
+    }
+
+    return seen_slash;
+}
+
+BOOL WINAPI PathIsRootA(const char *path)
+{
+    WCHAR pathW[MAX_PATH];
+
+    TRACE("%s\n", wine_dbgstr_a(path));
+
+    if (!MultiByteToWideChar(CP_ACP, 0, path, -1, pathW, MAX_PATH))
+        return FALSE;
+    if (is_prefixed_unc(pathW) || is_prefixed_disk(pathW) || is_prefixed_volume(pathW)) return FALSE;
+
+    return PathIsRootW(pathW);
+}
+
+BOOL WINAPI PathIsRootW(const WCHAR *path)
+{
+    TRACE("%s\n", wine_dbgstr_w(path));
+
+    return PathCchIsRoot(path);
+}
+
+BOOL WINAPI PathRemoveFileSpecA(char *path)
+{
+    char *root_end = NULL, *ptr;
+
+    TRACE("%s\n", debugstr_a(path));
+
+    if (!path || !*path)
+        return FALSE;
+
+    if (is_drive_specA(path))
+    {
+        root_end = path + 2;
+        if (*root_end == '\\') ++root_end;
+    }
+    else
+    {
+        root_end = path;
+        if (*root_end == '\\') ++root_end;
+        if (root_end[1] != '?')
+        {
+            if (*root_end == '\\') ++root_end;
+            if (root_end - path > 1 && is_drive_specA(root_end)) root_end += 2;
+            if (*root_end == '\\' && root_end[1] && root_end[1] != '\\') ++root_end;
+        }
+    }
+    ptr = StrRChrA(root_end, NULL, '\\');
+    if (ptr && ptr != root_end)
+    {
+        if (ptr[-1] == '\\') --ptr;
+        *ptr = 0;
+        return TRUE;
+    }
+    if (!*root_end) return FALSE;
+    *root_end = 0;
+    return TRUE;
+}
+
+BOOL WINAPI PathRemoveFileSpecW(WCHAR *path)
+{
+    WCHAR *root_end = NULL, *ptr;
+
+    TRACE("%s\n", debugstr_w(path));
+
+    if (!path || !*path)
+        return FALSE;
+
+    if (is_prefixed_volume(path))    root_end = path + 48;
+    else if (is_prefixed_disk(path)) root_end = path + 6;
+    else if (is_drive_spec(path))    root_end = path + 2;
+    if (!root_end)
+    {
+        root_end = path;
+        if (*root_end == '\\') ++root_end;
+        if (root_end[1] != '?')
+        {
+            if (*root_end == '\\') ++root_end;
+            if (root_end - path > 1 && is_drive_spec(root_end)) root_end += 2;
+            if (*root_end == '\\' && root_end[1] && root_end[1] != '\\') ++root_end;
+        }
+    }
+    else if (*root_end == '\\') ++root_end;
+    ptr = StrRChrW(root_end, NULL, '\\');
+    if (ptr && ptr != root_end)
+    {
+        if (ptr[-1] == '\\') --ptr;
+        *ptr = 0;
+        return TRUE;
+    }
+    if (!*root_end) return FALSE;
+    *root_end = 0;
+    return TRUE;
+}
+
+BOOL WINAPI PathStripToRootA(char *path)
+{
+    WCHAR pathW[MAX_PATH];
+
+    TRACE("%s\n", wine_dbgstr_a(path));
+
+    if (!MultiByteToWideChar(CP_ACP, 0, path, -1, pathW, MAX_PATH)) return FALSE;
+
+    *path = 0;
+    if (is_prefixed_unc(pathW) || is_prefixed_disk(pathW) || is_prefixed_volume(pathW)) return FALSE;
+    if (!PathStripToRootW(pathW)) return FALSE;
+    return !!WideCharToMultiByte(CP_ACP, 0, pathW, -1, path, MAX_PATH, 0, 0);
+}
+
+BOOL WINAPI PathStripToRootW(WCHAR *path)
+{
+    TRACE("%s\n", wine_dbgstr_w(path));
+
+    return SUCCEEDED(PathCchStripToRoot(path, PATHCCH_MAX_CCH));
+}
+
+LPSTR WINAPI PathAddBackslashA(char *path)
+{
+    unsigned int len;
+    char *prev = path;
+
+    TRACE("%s\n", wine_dbgstr_a(path));
+
+    if (!path || (len = strlen(path)) >= MAX_PATH)
+        return NULL;
+```
+
+[RAGSnippet score=3.5] kernelbase/path.c::PathIsRelativeA
+```c
+BOOL WINAPI PathIsRelativeA(const char *path)
+{
+    TRACE("%s\n", wine_dbgstr_a(path));
+
+    if (!path || !*path || IsDBCSLeadByte(*path))
+        return TRUE;
+
+    return !(*path == '\\' || (*path && path[1] == ':'));
+}
+
+BOOL WINAPI PathIsRelativeW(const WCHAR *path)
+{
+    TRACE("%s\n", wine_dbgstr_w(path));
+
+    if (!path || !*path)
+        return TRUE;
+
+    return !(*path == '\\' || (*path && path[1] == ':'));
+}
+
+BOOL WINAPI PathIsUNCServerShareA(const char *path)
+{
+    BOOL seen_slash = FALSE;
+
+    TRACE("%s\n", wine_dbgstr_a(path));
+
+    if (path && *path++ == '\\' && *path++ == '\\')
+    {
+        while (*path)
+        {
+            if (*path == '\\')
+            {
+                if (seen_slash)
+                    return FALSE;
+                seen_slash = TRUE;
+            }
+
+            path = CharNextA(path);
+        }
+    }
+
+    return seen_slash;
+}
+
+BOOL WINAPI PathIsUNCServerShareW(const WCHAR *path)
+{
+    BOOL seen_slash = FALSE;
+
+    TRACE("%s\n", wine_dbgstr_w(path));
+
+    if (path && *path++ == '\\' && *path++ == '\\')
+    {
+        while (*path)
+        {
+            if (*path == '\\')
+            {
+                if (seen_slash)
+                    return FALSE;
+                seen_slash = TRUE;
+            }
+
+            path++;
+        }
+    }
+
+    return seen_slash;
+}
+
+BOOL WINAPI PathIsRootA(const char *path)
+{
+    WCHAR pathW[MAX_PATH];
+
+    TRACE("%s\n", wine_dbgstr_a(path));
+
+    if (!MultiByteToWideChar(CP_ACP, 0, path, -1, pathW, MAX_PATH))
+        return FALSE;
+    if (is_prefixed_unc(pathW) || is_prefixed_disk(pathW) || is_prefixed_volume(pathW)) return FALSE;
+
+    return PathIsRootW(pathW);
+}
+
+BOOL WINAPI PathIsRootW(const WCHAR *path)
+{
+    TRACE("%s\n", wine_dbgstr_w(path));
+
+    return PathCchIsRoot(path);
+}
+
+BOOL WINAPI PathRemoveFileSpecA(char *path)
+{
+    char *root_end = NULL, *ptr;
+
+    TRACE("%s\n", debugstr_a(path));
+
+    if (!path || !*path)
+        return FALSE;
+
+    if (is_drive_specA(path))
+    {
+        root_end = path + 2;
+        if (*root_end == '\\') ++root_end;
+    }
+    else
+    {
+        root_end = path;
+        if (*root_end == '\\') ++root_end;
+        if (root_end[1] != '?')
+        {
+            if (*root_end == '\\') ++root_end;
+            if (root_end - path > 1 && is_drive_specA(root_end)) root_end += 2;
+            if (*root_end == '\\' && root_end[1] && root_end[1] != '\\') ++root_end;
+        }
+    }
+    ptr = StrRChrA(root_end, NULL, '\\');
+    if (ptr && ptr != root_end)
+    {
+        if (ptr[-1] == '\\') --ptr;
+        *ptr = 0;
+        return TRUE;
+    }
+    if (!*root_end) return FALSE;
+    *root_end = 0;
+    return TRUE;
+}
+
+BOOL WINAPI PathRemoveFileSpecW(WCHAR *path)
+{
+    WCHAR *root_end = NULL, *ptr;
+
+    TRACE("%s\n", debugstr_w(path));
+
+    if (!path || !*path)
+        return FALSE;
+
+    if (is_prefixed_volume(path))    root_end = path + 48;
+    else if (is_prefixed_disk(path)) root_end = path + 6;
+    else if (is_drive_spec(path))    root_end = path + 2;
+    if (!root_end)
+    {
+        root_end = path;
+        if (*root_end == '\\') ++root_end;
+        if (root_end[1] != '?')
+        {
+            if (*root_end == '\\') ++root_end;
+            if (root_end - path > 1 && is_drive_spec(root_end)) root_end += 2;
+            if (*root_end == '\\' && root_end[1] && root_end[1] != '\\') ++root_end;
+        }
+    }
+    else if (*root_end == '\\') ++root_end;
+    ptr = StrRChrW(root_end, NULL, '\\');
+    if (ptr && ptr != root_end)
+    {
+        if (ptr[-1] == '\\') --ptr;
+        *ptr = 0;
+        return TRUE;
+    }
+    if (!*root_end) return FALSE;
+    *root_end = 0;
+    return TRUE;
+}
+
+BOOL WINAPI PathStripToRootA(char *path)
+{
+    WCHAR pathW[MAX_PATH];
+
+    TRACE("%s\n", wine_dbgstr_a(path));
+
+    if (!MultiByteToWideChar(CP_ACP, 0, path, -1, pathW, MAX_PATH)) return FALSE;
+
+    *path = 0;
+    if (is_prefixed_unc(pathW) || is_prefixed_disk(pathW) || is_prefixed_volume(pathW)) return FALSE;
+    if (!PathStripToRootW(pathW)) return FALSE;
+    return !!WideCharToMultiByte(CP_ACP, 0, pathW, -1, path, MAX_PATH, 0, 0);
+}
+
+BOOL WINAPI PathStripToRootW(WCHAR *path)
+{
+    TRACE("%s\n", wine_dbgstr_w(path));
+
+    return SUCCEEDED(PathCchStripToRoot(path, PATHCCH_MAX_CCH));
+}
+```
+
+[RAGSnippet score=0.5] activeds/pathname.c::path_QueryInterface
+```c
+static HRESULT WINAPI path_QueryInterface(IADsPathname *iface, REFIID riid, void **obj)
+{
+    TRACE("%p,%s,%p\n", iface, debugstr_guid(riid), obj);
+
+    if (!riid || !obj) return E_INVALIDARG;
+
+    if (IsEqualGUID(riid, &IID_IUnknown) ||
+        IsEqualGUID(riid, &IID_IDispatch) ||
+        IsEqualGUID(riid, &IID_IADsPathname))
+    {
+        IADsPathname_AddRef(iface);
+        *obj = iface;
+        return S_OK;
+    }
+
+    FIXME("interface %s is not implemented\n", debugstr_guid(riid));
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI path_AddRef(IADsPathname *iface)
+{
+    ADsPathname *path = impl_from_IADsPathname(iface);
+    return InterlockedIncrement(&path->ref);
+}
+
+static ULONG WINAPI path_Release(IADsPathname *iface)
+{
+    ADsPathname *path = impl_from_IADsPathname(iface);
+    LONG ref = InterlockedDecrement(&path->ref);
+
+    if (!ref)
+    {
+        TRACE("destroying %p\n", iface);
+        SysFreeString(path->provider);
+        SysFreeString(path->server);
+        SysFreeString(path->dn);
+        free(path);
+    }
+
+    return ref;
+}
+
+static HRESULT WINAPI path_GetTypeInfoCount(IADsPathname *iface, UINT *count)
+{
+    FIXME("%p,%p: stub\n", iface, count);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI path_GetTypeInfo(IADsPathname *iface, UINT index, LCID lcid, ITypeInfo **info)
+{
+    FIXME("%p,%u,%#lx,%p: stub\n", iface, index, lcid, info);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI path_GetIDsOfNames(IADsPathname *iface, REFIID riid, LPOLESTR *names,
+                                         UINT count, LCID lcid, DISPID *dispid)
+{
+    FIXME("%p,%s,%p,%u,%lu,%p: stub\n", iface, debugstr_guid(riid), names, count, lcid, dispid);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI path_Invoke(IADsPathname *iface, DISPID dispid, REFIID riid, LCID lcid, WORD flags,
+                                  DISPPARAMS *params, VARIANT *result, EXCEPINFO *excepinfo, UINT *argerr)
+{
+    FIXME("%p,%ld,%s,%04lx,%04x,%p,%p,%p,%p: stub\n", iface, dispid, debugstr_guid(riid), lcid, flags,
+          params, result, excepinfo, argerr);
+    return E_NOTIMPL;
+}
+
+static HRESULT parse_path(BSTR path, BSTR *provider, BSTR *server, BSTR *dn)
+{
+    WCHAR *p, *p_server;
+    int server_len;
+
+    *provider = NULL;
+    *server = NULL;
+    *dn = NULL;
+
+    if (wcsnicmp(path, L"LDAP:", 5) != 0)
+        return E_ADS_BAD_PATHNAME;
+
+    *provider = SysAllocStringLen(path, 4);
+    if (!*provider) return E_OUTOFMEMORY;
+
+    p = path + 5;
+    if (!*p) return S_OK;
+
+    if (*p++ != '/' || *p++ != '/' || !*p)
+    {
+        SysFreeString(*provider);
+        return E_ADS_BAD_PATHNAME;
+    }
+
+    p_server = p;
+    server_len = 0;
+    while (*p && *p != '/')
+    {
+        p++;
+        server_len++;
+    }
+    if (server_len == 0)
+    {
+        SysFreeString(*provider);
+        return E_ADS_BAD_PATHNAME;
+    }
+
+    *server = SysAllocStringLen(p_server, server_len);
+    if (!*server)
+    {
+        SysFreeString(*provider);
+        return E_OUTOFMEMORY;
+    }
+
+    if (!*p) return S_OK;
+
+    if (*p++ != '/' || !*p)
+    {
+        SysFreeString(*provider);
+        SysFreeString(*server);
+        return E_ADS_BAD_PATHNAME;
+    }
+
+    *dn = SysAllocString(p);
+    if (!*dn)
+    {
+        SysFreeString(*provider);
+        SysFreeString(*server);
+        return E_OUTOFMEMORY;
+    }
+
+    return S_OK;
+}
+
+static HRESULT WINAPI path_Set(IADsPathname *iface, BSTR adspath, LONG type)
+{
+    ADsPathname *path = impl_from_IADsPathname(iface);
+    HRESULT hr;
+    BSTR provider, server, dn;
+
+    TRACE("%p,%s,%ld\n", iface, debugstr_w(adspath), type);
+
+    if (!adspath) return E_INVALIDARG;
+
+    if (type == ADS_SETTYPE_PROVIDER)
+    {
+        SysFreeString(path->provider);
+        path->provider = SysAllocString(adspath);
+        return path->provider ? S_OK : E_OUTOFMEMORY;
+    }
+
+    if (type == ADS_SETTYPE_SERVER)
+    {
+        SysFreeString(path->server);
+        path->server = SysAllocString(adspath);
+        return path->server ? S_OK : E_OUTOFMEMORY;
+    }
+
+    if (type == ADS_SETTYPE_DN)
+    {
+        SysFreeString(path->dn);
+        path->dn = SysAllocString(adspath);
+        return path->dn ? S_OK : E_OUTOFMEMORY;
+    }
+
+    if (type != ADS_SETTYPE_FULL)
+    {
+        FIXME("type %ld not implemented\n", type);
+        return E_INVALIDARG;
+    }
+
+    hr = parse_path(adspath, &provider, &server, &dn);
+    if (hr == S_OK)
+    {
+        SysFreeString(path->provider);
+        SysFreeString(path->server);
+        SysFreeString(path->dn);
+
+        path->provider = provider;
+        path->server = server;
+        path->dn = dn;
+    }
+```

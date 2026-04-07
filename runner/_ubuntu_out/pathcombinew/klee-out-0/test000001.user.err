@@ -1,0 +1,9 @@
+Error: invalid klee_assume call (provably false)
+File: ./oda_stubs.c
+Line: 54
+assembly.ll line: 159
+State: 3
+Stack: 
+	#000000159 in myPathAddBackslashW(125119863193600) at ./oda_stubs.c:54
+	#100000127 in PathCombineW(125119863193600, 125117715709952, 125115568226304) at harness_pathcombinew.c:46
+	#200000206 in main() at harness_pathcombinew.c:90

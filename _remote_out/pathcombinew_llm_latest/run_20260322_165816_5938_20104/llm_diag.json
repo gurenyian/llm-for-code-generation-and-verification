@@ -1,0 +1,25 @@
+{
+  "request": "PathCombineW",
+  "status": "success",
+  "model": "gpt-4o-mini",
+  "base_url": "default",
+  "temperature": 0.2,
+  "max_tokens": 2000,
+  "retries": 2,
+  "timeout_s": 30.0,
+  "proxy": {
+    "HTTP_PROXY": "http://127.0.0.1:7890",
+    "HTTPS_PROXY": "http://127.0.0.1:7890",
+    "ALL_PROXY": "socks5://127.0.0.1:7890",
+    "http_proxy": "http://127.0.0.1:7890",
+    "https_proxy": "http://127.0.0.1:7890",
+    "all_proxy": "socks5://127.0.0.1:7890"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "status": "success",
+      "elapsed_s": 26.413
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schema": "oda.remote_runner_config.v1",
+  "ssh": {
+    "host": "192.168.154.129",
+    "port": 22,
+    "user": "guren",
+    "auth_mode": "ssh-key",
+    "private_key_path": "C:/Users/Administrator/.ssh/id_ed25519",
+    "known_hosts_policy": "accept-new"
+  },
+  "network": {
+    "proxy_port": 7890,
+    "proxy_type": "http"
+  },
+  "workspace": {
+    "remote_root": "/home/guren/oda_work/oda_demo",
+    "local_root": "d:/wine/wine-master"
+  },
+  "klee": {
+    "timeout_sec": 120,
+    "max_memory_mb": 2048,
+    "output_dir": "klee-out-0"
+  }
+}

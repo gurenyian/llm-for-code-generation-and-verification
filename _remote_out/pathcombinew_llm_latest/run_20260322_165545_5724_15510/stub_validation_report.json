@@ -1,0 +1,14 @@
+{
+  "dependency_count": 9,
+  "spec_dependency_count": 7,
+  "missing_dependencies": [
+    "ARRAY_SIZE",
+    "PathCanonicalizeW",
+    "lstrcatW",
+    "myPathAddBackslashW"
+  ],
+  "predicate_dependency_count": 1,
+  "missing_predicate_dependencies": [],
+  "stub_contains_target": true,
+  "ok": false
+}

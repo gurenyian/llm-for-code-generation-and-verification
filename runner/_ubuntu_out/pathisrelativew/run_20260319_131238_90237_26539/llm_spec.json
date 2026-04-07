@@ -1,0 +1,29 @@
+{
+  "target_function": "PathIsRelativeW",
+  "description": "检查给定路径是否为相对路径。",
+  "dependencies": [
+    {
+      "name": "PathIsRelativeW",
+      "signature": "BOOL WINAPI PathIsRelativeW(const WCHAR *path)",
+      "description": "检查给定路径是否为相对路径。",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "返回值影响控制流，用于判断路径是否相对。",
+        "constraints": [
+          "if (path == NULL) return TRUE;",
+          "if (*path == 0) return TRUE;",
+          "int ret;",
+          "klee_make_symbolic(&ret, sizeof(ret), \"PathIsRelativeW_ret\");",
+          "klee_assume(ret >= 0 && ret <= 1);",
+          "if (ret == 0) klee_assume(*path != '\\' && (*(path + 1) != ':'));"
+        ]
+      }
+    }
+  ],
+  "target_predicates": [
+    {
+      "description": "检查路径是否为 NULL 或空字符串。",
+      "condition": "!path || !*path"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "schema": "oda.predicate_ir.v2",
+  "target": {
+    "function": "PathIsRelativeW",
+    "dll": "kernelbase",
+    "file": "path.c",
+    "requested": {
+      "dll": "kernelbase",
+      "file": "path.c"
+    }
+  },
+  "summary": {
+    "predicate_count": 1,
+    "dependency_count": 0,
+    "depends_on": []
+  },
+  "items": [
+    {
+      "condition": "!path || !*path",
+      "type": "if",
+      "line": 5,
+      "normalized_condition": "!path || !*path",
+      "symbols": [
+        "path"
+      ],
+      "ir": {
+        "kind": "or",
+        "items": [
+          {
+            "kind": "not",
+            "item": {
+              "kind": "expr",
+              "text": "path"
+            }
+          },
+          {
+            "kind": "not",
+            "item": {
+              "kind": "expr",
+              "text": "*path"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "dependencies": []
+}

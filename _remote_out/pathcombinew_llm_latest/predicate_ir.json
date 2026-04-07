@@ -1,0 +1,274 @@
+{
+  "schema": "oda.predicate_ir.v2",
+  "target": {
+    "function": "PathCombineW",
+    "dll": "kernelbase",
+    "file": "path.c",
+    "requested": {
+      "dll": "kernelbase",
+      "file": "path.c"
+    }
+  },
+  "summary": {
+    "predicate_count": 8,
+    "dependency_count": 9,
+    "depends_on": [
+      "PathAddBackslashW"
+    ]
+  },
+  "items": [
+    {
+      "condition": "!dst",
+      "type": "if",
+      "line": 9,
+      "normalized_condition": "!dst",
+      "symbols": [
+        "dst"
+      ],
+      "ir": {
+        "kind": "not",
+        "item": {
+          "kind": "expr",
+          "text": "dst"
+        }
+      },
+      "kind": "var_truthy",
+      "variable": "dst",
+      "depends_on": null,
+      "op": "truthy",
+      "rhs": null,
+      "polarity": "false"
+    },
+    {
+      "condition": "!dir && !file",
+      "type": "if",
+      "line": 12,
+      "normalized_condition": "!dir && !file",
+      "symbols": [
+        "dir",
+        "file"
+      ],
+      "ir": {
+        "kind": "and",
+        "items": [
+          {
+            "kind": "not",
+            "item": {
+              "kind": "expr",
+              "text": "dir"
+            }
+          },
+          {
+            "kind": "not",
+            "item": {
+              "kind": "expr",
+              "text": "file"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "condition": "(!file || !*file) && dir",
+      "type": "if",
+      "line": 18,
+      "normalized_condition": "(!file || !*file) && dir",
+      "symbols": [
+        "dir",
+        "file"
+      ],
+      "ir": {
+        "kind": "and",
+        "items": [
+          {
+            "kind": "or",
+            "items": [
+              {
+                "kind": "not",
+                "item": {
+                  "kind": "expr",
+                  "text": "file"
+                }
+              },
+              {
+                "kind": "not",
+                "item": {
+                  "kind": "expr",
+                  "text": "*file"
+                }
+              }
+            ]
+          },
+          {
+            "kind": "expr",
+            "text": "dir"
+          }
+        ]
+      }
+    },
+    {
+      "condition": "!dir || !*dir || !PathIsRelativeW(file)",
+      "type": "if",
+      "line": 23,
+      "normalized_condition": "!dir || !*dir || !PathIsRelativeW(file)",
+      "symbols": [
+        "PathIsRelativeW",
+        "dir",
+        "file"
+      ],
+      "ir": {
+        "kind": "or",
+        "items": [
+          {
+            "kind": "not",
+            "item": {
+              "kind": "expr",
+              "text": "dir"
+            }
+          },
+          {
+            "kind": "not",
+            "item": {
+              "kind": "expr",
+              "text": "*dir"
+            }
+          },
+          {
+            "kind": "not",
+            "item": {
+              "kind": "call",
+              "callee": "PathIsRelativeW",
+              "args": "file"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "condition": "!dir || !*dir || *file != '\\\\' || PathIsUNCW(file)",
+      "type": "if",
+      "line": 25,
+      "normalized_condition": "!dir || !*dir || *file != '\\\\' || PathIsUNCW(file)",
+      "symbols": [
+        "PathIsUNCW",
+        "dir",
+        "file"
+      ],
+      "ir": {
+        "kind": "or",
+        "items": [
+          {
+            "kind": "not",
+            "item": {
+              "kind": "expr",
+              "text": "dir"
+            }
+          },
+          {
+            "kind": "not",
+            "item": {
+              "kind": "expr",
+              "text": "*dir"
+            }
+          },
+          {
+            "kind": "compare",
+            "op": "!=",
+            "left": "*file",
+            "right": "'\\\\'"
+          },
+          {
+            "kind": "call",
+            "callee": "PathIsUNCW",
+            "args": "file"
+          }
+        ]
+      }
+    },
+    {
+      "condition": "use_both",
+      "type": "if",
+      "line": 39,
+      "normalized_condition": "use_both",
+      "symbols": [
+        "use_both"
+      ],
+      "ir": {
+        "kind": "expr",
+        "text": "use_both"
+      },
+      "kind": "var_truthy",
+      "variable": "use_both",
+      "depends_on": null,
+      "op": "truthy",
+      "rhs": null,
+      "polarity": "true"
+    },
+    {
+      "condition": "strip",
+      "type": "if",
+      "line": 42,
+      "normalized_condition": "strip",
+      "symbols": [
+        "strip"
+      ],
+      "ir": {
+        "kind": "expr",
+        "text": "strip"
+      },
+      "kind": "var_truthy",
+      "variable": "strip",
+      "depends_on": null,
+      "op": "truthy",
+      "rhs": null,
+      "polarity": "true"
+    },
+    {
+      "condition": "!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH",
+      "type": "if",
+      "line": 48,
+      "normalized_condition": "!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH",
+      "symbols": [
+        "PathAddBackslashW",
+        "file",
+        "lstrlenW",
+        "tmp"
+      ],
+      "ir": {
+        "kind": "or",
+        "items": [
+          {
+            "kind": "not",
+            "item": {
+              "kind": "call",
+              "callee": "PathAddBackslashW",
+              "args": "tmp"
+            }
+          },
+          {
+            "kind": "compare",
+            "op": ">=",
+            "left": "lstrlenW(tmp) + lstrlenW(file)",
+            "right": "MAX_PATH"
+          }
+        ]
+      },
+      "kind": "call_compare",
+      "depends_on": "PathAddBackslashW",
+      "op": ">=",
+      "rhs": "MAX_PATH",
+      "polarity": "false"
+    }
+  ],
+  "dependencies": [
+    "ARRAY_SIZE",
+    "myPathAddBackslashW",
+    "PathCanonicalizeW",
+    "PathIsRelativeW",
+    "PathIsUNCW",
+    "PathStripToRootW",
+    "lstrcatW",
+    "KERNELBASE_lstrcpynW",
+    "KERNELBASE_lstrlenW"
+  ]
+}

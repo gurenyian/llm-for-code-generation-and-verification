@@ -1,0 +1,9 @@
+[llm_config_failed] ModuleNotFoundError: No module named 'openai'
+
+Traceback (most recent call last):
+  File "d:\wine\wine-master\oda_demo\scripts\generate_oda_with_llm.py", line 350, in main
+    llm = OpenAICompatLLM(cfg)
+  File "D:\wine\wine-master\oda_demo\llm_integration\llm_client.py", line 190, in __init__
+    from openai import OpenAI  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'openai'

@@ -1,0 +1,52 @@
+{
+  "target_function": "PathIsRelativeW",
+  "description": "Determines whether a path string is relative or absolute",
+  "dependencies": [
+    {
+      "name": "lstrlenW",
+      "signature": "int WINAPI lstrlenW(LPCWSTR lpString)",
+      "description": "Returns the length of a wide-character string",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "Length affects control flow in path parsing",
+        "constraints": [
+          "if (lpString == NULL) return 0;",
+          "int len;",
+          "klee_make_symbolic(&len, sizeof(len), \"lstrlenW_ret\");",
+          "klee_assume(len >= 0 && len <= 260);",
+          "if (len > 0) klee_assume(lpString[0] != 0);",
+          "return len;"
+        ]
+      }
+    }
+  ],
+  "target_predicates": [
+    {
+      "description": "Path is relative",
+      "condition": "return == TRUE"
+    },
+    {
+      "description": "Path is absolute",
+      "condition": "return == FALSE"
+    }
+  ],
+  "test_inputs": {
+    "symbolic_vars": [
+      {
+        "name": "path",
+        "type": "WCHAR[260]",
+        "description": "Input path string (MAX_PATH)"
+      }
+    ],
+    "interesting_values": [
+      "NULL",
+      "\"\"",
+      "\"C:\\\\\"",
+      "\"C:\\\\Windows\"",
+      "\"\\\\\\\\server\\\\share\"",
+      "\"relative\\\\path\"",
+      "\".\\\\current\"",
+      "\"..\\\\parent\""
+    ]
+  }
+}

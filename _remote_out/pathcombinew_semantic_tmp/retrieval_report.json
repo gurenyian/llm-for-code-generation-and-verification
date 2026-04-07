@@ -1,0 +1,89 @@
+{
+  "target_function": "PathCombineW",
+  "target_dll": "kernelbase",
+  "target_file": "path.c",
+  "requested_dll": "kernelbase",
+  "requested_file": "path.c",
+  "resolution": {
+    "requested": {
+      "dll": "kernelbase",
+      "file": "path.c",
+      "func": "PathCombineW"
+    },
+    "resolved": null,
+    "resolution": "as_requested",
+    "candidates": []
+  },
+  "resolved_source_path": "D:\\wine\\wine-master\\dlls\\kernelbase\\path.c",
+  "resolved_source_path_hint": "dlls/kernelbase/path.c",
+  "dependency_count": 9,
+  "predicate_count": 8,
+  "dependency_names": [
+    "ARRAY_SIZE",
+    "PathAddBackslashW",
+    "PathCanonicalizeW",
+    "PathIsRelativeW",
+    "PathIsUNCW",
+    "PathStripToRootW",
+    "lstrcatW",
+    "KERNELBASE_lstrcpynW",
+    "lstrlenW"
+  ],
+  "predicate_depends_on": [
+    "PathAddBackslashW"
+  ],
+  "rag_candidates": [
+    {
+      "dll": "kernelbase",
+      "file": "path.c",
+      "name": "PathCombineW",
+      "score": 14.0,
+      "signature": "WCHAR * WINAPI PathCombineW(WCHAR *dst, const WCHAR *dir, const WCHAR *file)",
+      "summary": "Combines a directory path with a file/relative path.",
+      "callsites": [],
+      "code_included": true
+    },
+    {
+      "dll": "activeds",
+      "file": "pathname.c",
+      "name": "path_QueryInterface",
+      "score": 1.0,
+      "signature": "} static HRESULT WINAPI path_QueryInterface(IADsPathname *iface, REFIID riid, void **obj)",
+      "summary": "Function path_QueryInterface described by signature: } static HRESULT WINAPI path_QueryInterface(IADsPathname *iface, REFIID riid, void **obj).",
+      "callsites": [],
+      "code_included": true
+    },
+    {
+      "dll": "activeds",
+      "file": "pathname.c",
+      "name": "path_AddRef",
+      "score": 1.0,
+      "signature": "static ULONG WINAPI path_AddRef(IADsPathname *iface)",
+      "summary": "obj = iface;",
+      "callsites": [],
+      "code_included": true
+    }
+  ],
+  "rag_candidate_count": 21,
+  "rag_topk": [
+    {
+      "dll": "kernelbase",
+      "file": "path.c",
+      "name": "PathCombineW",
+      "score": 14.0
+    },
+    {
+      "dll": "activeds",
+      "file": "pathname.c",
+      "name": "path_QueryInterface",
+      "score": 1.0
+    },
+    {
+      "dll": "activeds",
+      "file": "pathname.c",
+      "name": "path_AddRef",
+      "score": 1.0
+    }
+  ],
+  "source_snippet_used": true
+}

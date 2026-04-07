@@ -1,0 +1,243 @@
+{
+  "schema": "oda.function_spec.v1",
+  "target_function": "PathCombineW",
+  "signature": "WCHAR * WINAPI PathCombineW(WCHAR *dst, const WCHAR *dir, const WCHAR *file)",
+  "target_dll": "kernelbase",
+  "target_file": "path.c",
+  "description": "Combines two path strings into a single path.",
+  "symbolic_inputs": [
+    {
+      "name": "dst",
+      "type": "WCHAR[MAX_PATH]",
+      "init": "WCHAR dst[MAX_PATH] = {0};",
+      "assumptions": [
+        "dst is writable",
+        "dst[MAX_PATH-1] == 0"
+      ]
+    },
+    {
+      "name": "dir",
+      "type": "WCHAR[MAX_PATH]",
+      "init": "WCHAR dir[MAX_PATH] = {0}; klee_make_symbolic(dir, sizeof(dir), \"dir\");",
+      "assumptions": [
+        "dir[MAX_PATH-1] == 0",
+        "dir[0] == 0 || dir[0] == '\\\\' || dir[1] == ':' || dir[0] >= 'A'"
+      ]
+    },
+    {
+      "name": "file",
+      "type": "WCHAR[MAX_PATH]",
+      "init": "WCHAR file[MAX_PATH] = {0}; klee_make_symbolic(file, sizeof(file), \"file\");",
+      "assumptions": [
+        "file[MAX_PATH-1] == 0",
+        "file[0] == 0 || file[0] == '\\\\' || file[1] == ':' || file[0] >= 'A'"
+      ]
+    }
+  ],
+  "coverage_goal": {
+    "path_mode": "feasible_paths",
+    "acceptance": [
+      "missing_predicate_dependencies is empty",
+      "target function Icov == I",
+      "Iuncov == 0",
+      "Completed paths stable across reruns"
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "ARRAY_SIZE",
+      "signature": "ARRAY_SIZE(attrs)",
+      "source_hint": "macro-like helper",
+      "abstraction": {
+        "type": "noop",
+        "reason": "仅用于数组大小计算，不影响控制流。",
+        "constraints": []
+      }
+    },
+    {
+      "name": "myPathAddBackslashW",
+      "signature": "static LPWSTR myPathAddBackslashW(LPWSTR lpszPath)",
+      "source_hint": "explorerframe/tests/nstc.c",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "返回值会直接决定 PathCombineW 是否返回 NULL。",
+        "constraints": [
+          "if (lpszPath == NULL) return NULL;",
+          "LPWSTR ret;",
+          "klee_make_symbolic(&ret, sizeof(ret), \"myPathAddBackslashW_ret\");",
+          "klee_assume(ret == lpszPath || ret == NULL);",
+          "return ret;"
+        ]
+      }
+    },
+    {
+      "name": "PathCanonicalizeW",
+      "signature": "BOOL WINAPI PathCanonicalizeW(WCHAR *buffer, const WCHAR *path)",
+      "source_hint": "kernelbase/path.c",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "用于最终返回路径是否有效的分支。",
+        "constraints": [
+          "if (buffer == NULL) return FALSE;",
+          "if (path == NULL) return FALSE;",
+          "BOOL ret;",
+          "klee_make_symbolic(&ret, sizeof(ret), \"PathCanonicalizeW_ret\");",
+          "klee_assume(ret == TRUE || ret == FALSE);",
+          "return ret;"
+        ]
+      }
+    },
+    {
+      "name": "PathIsRelativeW",
+      "signature": "BOOL WINAPI PathIsRelativeW(const WCHAR *path)",
+      "source_hint": "kernelbase/path.c",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "返回值影响是否进入 use_both 分支。",
+        "constraints": [
+          "if (path == NULL) return FALSE;",
+          "BOOL ret;",
+          "klee_make_symbolic(&ret, sizeof(ret), \"PathIsRelativeW_ret\");",
+          "klee_assume(ret == TRUE || ret == FALSE);",
+          "return ret;"
+        ]
+      }
+    },
+    {
+      "name": "PathIsUNCW",
+      "signature": "BOOL WINAPI PathIsUNCW(const WCHAR *path)",
+      "source_hint": "kernelbase/path.c",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "返回值影响是否走 file-only 或 strip 路径。",
+        "constraints": [
+          "if (path == NULL) return FALSE;",
+          "BOOL ret;",
+          "klee_make_symbolic(&ret, sizeof(ret), \"PathIsUNCW_ret\");",
+          "klee_assume(ret == TRUE || ret == FALSE);",
+          "return ret;"
+        ]
+      }
+    },
+    {
+      "name": "PathStripToRootW",
+      "signature": "BOOL WINAPI PathStripToRootW(WCHAR *path)",
+      "source_hint": "kernelbase/path.c",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "返回值影响 strip 分支是否继续。",
+        "constraints": [
+          "if (path == NULL) return FALSE;",
+          "BOOL ret;",
+          "klee_make_symbolic(&ret, sizeof(ret), \"PathStripToRootW_ret\");",
+          "klee_assume(ret == TRUE || ret == FALSE);",
+          "return ret;"
+        ]
+      }
+    },
+    {
+      "name": "PathAddBackslashW",
+      "signature": "LPWSTR WINAPI PathAddBackslashW(LPWSTR path)",
+      "source_hint": "missing_predicate_dependencies",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "关键谓词依赖，必须显式补入，才能驱动长度边界和返回 NULL 分支。",
+        "constraints": [
+          "if (path == NULL) return NULL;",
+          "LPWSTR ret;",
+          "klee_make_symbolic(&ret, sizeof(ret), \"PathAddBackslashW_ret\");",
+          "klee_assume(ret == path || ret == NULL);",
+          "return ret;"
+        ]
+      }
+    },
+    {
+      "name": "lstrcatW",
+      "signature": "LPWSTR WINAPI lstrcatW(LPWSTR dst, LPCWSTR src)",
+      "source_hint": "kernel32/virtual.c",
+      "abstraction": {
+        "type": "noop",
+        "reason": "返回值不影响路径分裂，但必须返回 dst 避免编译警告。",
+        "constraints": [
+          "return dst;"
+        ]
+      }
+    },
+    {
+      "name": "KERNELBASE_lstrcpynW",
+      "signature": "LPWSTR WINAPI KERNELBASE_lstrcpynW(LPWSTR dst, LPCWSTR src, INT n)",
+      "source_hint": "kernelbase/string.c",
+      "abstraction": {
+        "type": "noop",
+        "reason": "返回值不影响路径分裂，但必须返回 dst。",
+        "constraints": [
+          "return dst;"
+        ]
+      }
+    },
+    {
+      "name": "KERNELBASE_lstrlenW",
+      "signature": "INT WINAPI KERNELBASE_lstrlenW(LPCWSTR str)",
+      "source_hint": "kernelbase/string.c",
+      "abstraction": {
+        "type": "symbolic_return",
+        "reason": "长度比较直接决定是否命中 MAX_PATH 边界。",
+        "constraints": [
+          "if (str == NULL) return 0;",
+          "int len;",
+          "klee_make_symbolic(&len, sizeof(len), \"KERNELBASE_lstrlenW_ret\");",
+          "klee_assume(len >= 0 && len <= 260);",
+          "if (len > 0) klee_assume(str[0] != 0);",
+          "return len;"
+        ]
+      }
+    }
+  ],
+  "target_predicates": [
+    {
+      "condition": "!dst",
+      "depends_on": [],
+      "boundary_notes": "dst 为空指针的早返回路径。"
+    },
+    {
+      "condition": "!dir && !file",
+      "depends_on": [],
+      "boundary_notes": "dir/file 同时为空的早返回路径。"
+    },
+    {
+      "condition": "(!file || !*file) && dir",
+      "depends_on": ["KERNELBASE_lstrcpynW"],
+      "boundary_notes": "file 空串与非空串两侧都要可达。"
+    },
+    {
+      "condition": "!dir || !*dir || !PathIsRelativeW(file)",
+      "depends_on": ["PathIsRelativeW"],
+      "boundary_notes": "relative / non-relative 都要能触发。"
+    },
+    {
+      "condition": "!dir || !*dir || *file != '\\\\' || PathIsUNCW(file)",
+      "depends_on": ["PathIsUNCW"],
+      "boundary_notes": "file 以反斜杠开头与 UNC 分支都要可达。"
+    },
+    {
+      "condition": "use_both",
+      "depends_on": ["PathIsRelativeW", "PathIsUNCW"],
+      "boundary_notes": "需要同时驱动目录与文件合并分支。"
+    },
+    {
+      "condition": "strip",
+      "depends_on": ["PathStripToRootW"],
+      "boundary_notes": "strip 分支必须可达且能继续执行。"
+    },
+    {
+      "condition": "!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH",
+      "depends_on": ["PathAddBackslashW", "KERNELBASE_lstrlenW"],
+      "boundary_notes": "必须覆盖成功/失败两侧，以及长度等于/超过 MAX_PATH 的边界。"
+    }
+  ],
+  "llm_feedback": {
+    "missing_predicate_dependencies": ["PathAddBackslashW"],
+    "klee_warnings": [],
+    "rebuild_stub": true
+  }
+}

@@ -1,0 +1,598 @@
+# Role
+你是一个资深的程序分析专家，精通 C/C++ 语言、Windows 内部 API 语义以及 KLEE 符号执行技术。你的任务是为函数 `{{TargetFunctionName}}` 生成 ODA（On-Demand Abstraction）打桩代码（Stubs）。
+
+# Context
+我们正在进行 Wine 与真实 Windows API 的差异化测试（Differential Testing）。KLEE 生成的测试用例最终将在真实 Windows 上运行。因此，Stub 代码必须兼顾“路径探索效率”与“逻辑真实性”。
+
+# Classification & Strategy (核心逻辑)
+请分析 {{TargetFunctionName}} 中的每一个外部依赖函数，并将其归类为以下四种抽象策略之一：
+
+1. **Semantic_Binding (控制流决策点)**
+   - **适用条件**：函数返回值直接进入 `if/else`、`switch` 或循环判定。
+   - **实现方法**：符号化返回值 + 强制语义绑定。
+   - **关键要求**：必须根据文档逻辑，使用 `klee_assume` 将输入参数的状态与返回值强行绑定。
+   - **示例**：`PathIsUNCW(p)` 返回 1 时，必须 `klee_assume(p[0]=='\' && p[1]=='\')`。
+
+2. **Bounded_Concrete (内存操作搬运工)**
+   - **适用条件**：基础字符串操作（strlen, strcpy, strcat, memcmp 等）。
+   - **实现方法**：手写极简的 C 逻辑，严禁使用符号化返回值。
+   - **关键要求**：必须带上硬编码的长度上限（建议 Max 64），防止路径爆炸；必须真实修改内存，确保数据流连通。
+
+3. **Symbolic_Output (数据提供者)**
+   - **适用条件**：通过指针参数返回复杂结构体或数据的函数。
+   - **实现方法**：对输出指针指向的内存进行 `klee_make_symbolic`，并根据文档约束其字段的合法取值范围。
+
+4. **No-op (环境噪音)**
+   - **适用条件**：TRACE, WARN, FIXME, 性能统计等不影响程序逻辑的函数。
+   - **实现方法**：直接返回固定值或空操作。
+
+# Strict Rules (铁律)
+1. **防范假阳性**：严禁生成在真实 Windows 上永远不可能发生的输入组合。如果 `ret` 为假，必须约束输入参数不满足该函数的成功条件。
+2. **防范路径爆炸**：Stub 内部禁止调用其他非基础函数。所有循环必须有 `i < 64` 这种硬性跳出约束。
+3. **符号命名**：`klee_make_symbolic` 的名称必须唯一且使用双引号字面量，例如 `"oda_PathIsRelativeW_ret"`。
+4. **编译兼容性**：所有 Stub 必须包含正确的返回类型，即使是 `noop` 也应返回合理的默认值（如 NULL 或 TRUE），避免编译警告。
+5. **语义绑定模板**：凡是 Semantic_Binding，必须显式写出 `ret` 与输入条件的双向绑定（ret=1/0 分支都要有 klee_assume）。
+6. **数据流优先**：若依赖项包含 `mutability.has_mutable_pointer=true` 或 `data_flow_notes` 提示该函数写入参数且后续被使用，则禁止 No-op，必须用 **Bounded_Concrete** 或 **Symbolic_Output** 建模写入效果。
+
+# Semantic_Binding Template
+若某函数语义为“返回真当且仅当满足条件 C”，必须按以下模板生成：
+```c
+BOOL WINAPI Func(T1 a, ...) {
+  int ret = klee_make_symbolic_int("oda_Func_ret");
+  klee_assume(ret == 0 || ret == 1);
+  // 必要的非空/边界约束
+  if (ret) {
+    // ret==1 => 条件成立
+    klee_assume(C);
+  } else {
+    // ret==0 => 条件不成立
+    klee_assume(!(C));
+  }
+  return ret;
+}
+```
+
+# Output Format
+必须覆盖所有依赖函数（依赖列表中的每个函数都要输出），不允许遗漏。
+如果依赖项不是函数（例如宏/内联 helper，如 ARRAY_SIZE），也必须输出一个条目，
+在 stub_code 中给出等价的 #define 或 inline 实现，以确保编译通过。
+依赖名称必须与列表中的 name 完全一致。
+请以 JSON 格式输出规约，结构如下：
+{
+  "target_function": "函数名",
+  "dependencies": [
+    {
+      "function": "被调用函数名",
+      "strategy": "上述四类之一",
+      "reasoning": "为什么要选这个策略，它在目标函数中起什么作用",
+      "stub_code": "完整的 C 语言打桩代码实现"
+    }
+  ]
+}
+
+只输出 JSON，不要有任何开场白或解释文字。
+
+# Target Function
+PathCombineW
+
+# Required dependency names (must all appear in output)
+[
+  "ARRAY_SIZE",
+  "PathAddBackslashW",
+  "PathCanonicalizeW",
+  "PathIsRelativeW",
+  "PathIsUNCW",
+  "PathStripToRootW",
+  "lstrcatW",
+  "KERNELBASE_lstrcpynW",
+  "lstrlenW"
+]
+
+# Dependencies to stub (full metadata)
+[
+  {
+    "name": "ARRAY_SIZE",
+    "signature": "for (i = 0; i < ARRAY_SIZE(not_supported); i++)",
+    "summary": "Function ARRAY_SIZE described by signature: for (i = 0; i < ARRAY_SIZE(not_supported); i++).",
+    "dll": "adsldp",
+    "file": "schema.c",
+    "call_count": 3,
+    "mutability": {
+      "has_pointer": false,
+      "has_mutable_pointer": false,
+      "mutable_args": []
+    },
+    "data_flow_notes": []
+  },
+  {
+    "name": "PathAddBackslashW",
+    "signature": "LPWSTR WINAPI PathAddBackslashW(WCHAR *path)",
+    "summary": "path++ = '\\\\'; path = '\\0';",
+    "dll": "kernelbase",
+    "file": "path.c",
+    "call_count": 1,
+    "mutability": {
+      "has_pointer": true,
+      "has_mutable_pointer": true,
+      "mutable_args": [
+        "WCHAR *path"
+      ]
+    },
+    "data_flow_notes": [
+      "包含非 const 指针参数，可能写入输入缓冲区（未发现直接条件使用）。"
+    ]
+  },
+  {
+    "name": "PathCanonicalizeW",
+    "signature": "BOOL WINAPI PathCanonicalizeW(WCHAR *buffer, const WCHAR *path)",
+    "summary": "Canonicalizes a path (resolves . and ..).",
+    "dll": "kernelbase",
+    "file": "path.c",
+    "call_count": 0,
+    "mutability": {
+      "has_pointer": true,
+      "has_mutable_pointer": true,
+      "mutable_args": [
+        "WCHAR *buffer"
+      ]
+    },
+    "data_flow_notes": [
+      "包含非 const 指针参数，可能写入输入缓冲区（未发现直接条件使用）。"
+    ]
+  },
+  {
+    "name": "PathIsRelativeW",
+    "signature": "BOOL WINAPI PathIsRelativeW(const WCHAR *path)",
+    "summary": "Checks whether a path is relative.",
+    "dll": "kernelbase",
+    "file": "path.c",
+    "call_count": 1,
+    "mutability": {
+      "has_pointer": false,
+      "has_mutable_pointer": false,
+      "mutable_args": []
+    },
+    "data_flow_notes": []
+  },
+  {
+    "name": "PathIsUNCW",
+    "signature": "BOOL WINAPI PathIsUNCW(const WCHAR *path)",
+    "summary": "Checks whether a path is a UNC path (\\\\server\\share).",
+    "dll": "kernelbase",
+    "file": "path.c",
+    "call_count": 1,
+    "mutability": {
+      "has_pointer": false,
+      "has_mutable_pointer": false,
+      "mutable_args": []
+    },
+    "data_flow_notes": []
+  },
+  {
+    "name": "PathStripToRootW",
+    "signature": "BOOL WINAPI PathStripToRootW(WCHAR *path)",
+    "summary": "path = 0;",
+    "dll": "kernelbase",
+    "file": "path.c",
+    "call_count": 1,
+    "mutability": {
+      "has_pointer": true,
+      "has_mutable_pointer": true,
+      "mutable_args": [
+        "WCHAR *path"
+      ]
+    },
+    "data_flow_notes": [
+      "可能写入参数 'tmp'（非 const 指针），该变量在后续条件(line 52)中被使用：!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH"
+    ]
+  },
+  {
+    "name": "lstrcatW",
+    "signature": "/*********************************************************************** * lstrcatW(KERNEL32.@) */ LPWSTR WINAPI lstrcatW( LPWSTR dst, LPCWSTR src)",
+    "summary": "Function lstrcatW described by signature: /*********************************************************************** * lstrcatW(KERNEL32.@) */ LPWSTR WINAPI lstrcatW( LPWSTR dst, LPCWSTR src).",
+    "dll": "kernel32",
+    "file": "virtual.c",
+    "call_count": 1,
+    "mutability": {
+      "has_pointer": true,
+      "has_mutable_pointer": true,
+      "mutable_args": [
+        "KERNEL32.@) */ LPWSTR WINAPI lstrcatW( LPWSTR dst",
+        "LPCWSTR src"
+      ]
+    },
+    "data_flow_notes": [
+      "包含非 const 指针参数，可能写入输入缓冲区（未发现直接条件使用）。"
+    ]
+  },
+  {
+    "name": "KERNELBASE_lstrcpynW",
+    "signature": "LPWSTR WINAPI KERNELBASE_lstrcpynW(LPWSTR dst, LPCWSTR src, INT n)",
+    "summary": "Function KERNELBASE_lstrcpynW described by signature: LPWSTR WINAPI KERNELBASE_lstrcpynW(LPWSTR dst, LPCWSTR src, INT n).",
+    "dll": "kernelbase",
+    "file": "string.c",
+    "call_count": 3,
+    "mutability": {
+      "has_pointer": true,
+      "has_mutable_pointer": true,
+      "mutable_args": [
+        "LPWSTR dst",
+        "LPCWSTR src"
+      ]
+    },
+    "data_flow_notes": [
+      "可能写入参数 'tmp'（非 const 指针），该变量在后续条件(line 52)中被使用：!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH",
+      "可能写入参数 'dir'（非 const 指针），该变量在后续条件(line 27)中被使用：!dir || !*dir || !PathIsRelativeW(file)",
+      "可能写入参数 'tmp'（非 const 指针），该变量在后续条件(line 52)中被使用：!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH",
+      "可能写入参数 'file'（非 const 指针），该变量在后续条件(line 52)中被使用：!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH",
+      "可能写入参数 'tmp'（非 const 指针），该变量在后续条件(line 52)中被使用：!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH"
+    ]
+  },
+  {
+    "name": "lstrlenW",
+    "signature": "for (iter = process->environment; *iter; iter += lstrlenW(iter) + 1)",
+    "summary": "Function lstrlenW described by signature: for (iter = process->environment; *iter; iter += lstrlenW(iter) + 1).",
+    "dll": "dbghelp",
+    "file": "dbghelp.c",
+    "call_count": 2,
+    "mutability": {
+      "has_pointer": true,
+      "has_mutable_pointer": true,
+      "mutable_args": [
+        "iter = process->environment; *iter; iter += lstrlenW(iter) + 1"
+      ]
+    },
+    "data_flow_notes": [
+      "包含非 const 指针参数，可能写入输入缓冲区（未发现直接条件使用）。"
+    ]
+  }
+]
+
+# Predicates
+[
+  {
+    "condition": "!dst",
+    "type": "if",
+    "line": 13,
+    "normalized_condition": "!dst",
+    "symbols": [
+      "dst"
+    ],
+    "ir": {
+      "kind": "not",
+      "item": {
+        "kind": "expr",
+        "text": "dst"
+      }
+    },
+    "kind": "var_truthy",
+    "variable": "dst",
+    "depends_on": null,
+    "op": "truthy",
+    "rhs": null,
+    "polarity": "false"
+  },
+  {
+    "condition": "!dir && !file",
+    "type": "if",
+    "line": 16,
+    "normalized_condition": "!dir && !file",
+    "symbols": [
+      "dir",
+      "file"
+    ],
+    "ir": {
+      "kind": "and",
+      "items": [
+        {
+          "kind": "not",
+          "item": {
+            "kind": "expr",
+            "text": "dir"
+          }
+        },
+        {
+          "kind": "not",
+          "item": {
+            "kind": "expr",
+            "text": "file"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "condition": "(!file || !*file) && dir",
+    "type": "if",
+    "line": 22,
+    "normalized_condition": "(!file || !*file) && dir",
+    "symbols": [
+      "dir",
+      "file"
+    ],
+    "ir": {
+      "kind": "and",
+      "items": [
+        {
+          "kind": "or",
+          "items": [
+            {
+              "kind": "not",
+              "item": {
+                "kind": "expr",
+                "text": "file"
+              }
+            },
+            {
+              "kind": "not",
+              "item": {
+                "kind": "expr",
+                "text": "*file"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "expr",
+          "text": "dir"
+        }
+      ]
+    }
+  },
+  {
+    "condition": "!dir || !*dir || !PathIsRelativeW(file)",
+    "type": "if",
+    "line": 27,
+    "normalized_condition": "!dir || !*dir || !PathIsRelativeW(file)",
+    "symbols": [
+      "PathIsRelativeW",
+      "dir",
+      "file"
+    ],
+    "ir": {
+      "kind": "or",
+      "items": [
+        {
+          "kind": "not",
+          "item": {
+            "kind": "expr",
+            "text": "dir"
+          }
+        },
+        {
+          "kind": "not",
+          "item": {
+            "kind": "expr",
+            "text": "*dir"
+          }
+        },
+        {
+          "kind": "not",
+          "item": {
+            "kind": "call",
+            "callee": "PathIsRelativeW",
+            "args": "file"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "condition": "!dir || !*dir || *file != '\\\\' || PathIsUNCW(file)",
+    "type": "if",
+    "line": 29,
+    "normalized_condition": "!dir || !*dir || *file != '\\\\' || PathIsUNCW(file)",
+    "symbols": [
+      "PathIsUNCW",
+      "dir",
+      "file"
+    ],
+    "ir": {
+      "kind": "or",
+      "items": [
+        {
+          "kind": "not",
+          "item": {
+            "kind": "expr",
+            "text": "dir"
+          }
+        },
+        {
+          "kind": "not",
+          "item": {
+            "kind": "expr",
+            "text": "*dir"
+          }
+        },
+        {
+          "kind": "compare",
+          "op": "!=",
+          "left": "*file",
+          "right": "'\\\\'"
+        },
+        {
+          "kind": "call",
+          "callee": "PathIsUNCW",
+          "args": "file"
+        }
+      ]
+    }
+  },
+  {
+    "condition": "use_both",
+    "type": "if",
+    "line": 43,
+    "normalized_condition": "use_both",
+    "symbols": [
+      "use_both"
+    ],
+    "ir": {
+      "kind": "expr",
+      "text": "use_both"
+    },
+    "kind": "var_truthy",
+    "variable": "use_both",
+    "depends_on": null,
+    "op": "truthy",
+    "rhs": null,
+    "polarity": "true"
+  },
+  {
+    "condition": "strip",
+    "type": "if",
+    "line": 46,
+    "normalized_condition": "strip",
+    "symbols": [
+      "strip"
+    ],
+    "ir": {
+      "kind": "expr",
+      "text": "strip"
+    },
+    "kind": "var_truthy",
+    "variable": "strip",
+    "depends_on": null,
+    "op": "truthy",
+    "rhs": null,
+    "polarity": "true"
+  },
+  {
+    "condition": "!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH",
+    "type": "if",
+    "line": 52,
+    "normalized_condition": "!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH",
+    "symbols": [
+      "PathAddBackslashW",
+      "file",
+      "lstrlenW",
+      "tmp"
+    ],
+    "ir": {
+      "kind": "or",
+      "items": [
+        {
+          "kind": "not",
+          "item": {
+            "kind": "call",
+            "callee": "PathAddBackslashW",
+            "args": "tmp"
+          }
+        },
+        {
+          "kind": "compare",
+          "op": ">=",
+          "left": "lstrlenW(tmp) + lstrlenW(file)",
+          "right": "MAX_PATH"
+        }
+      ]
+    },
+    "kind": "call_compare",
+    "depends_on": "PathAddBackslashW",
+    "op": ">=",
+    "rhs": "MAX_PATH",
+    "polarity": "false"
+  }
+]
+
+
+[RAGEvidence]
+下面是从索引/源码召回的候选片段（可能包含目标函数或其邻近实现）。请用它们来补齐依赖与谓词，避免漏 stub：
+
+[RAGSnippet score=14.0] kernelbase/path.c::PathCombineW
+```c
+
+    return ret;
+}
+
+WCHAR * WINAPI PathCombineW(WCHAR *dst, const WCHAR *dir, const WCHAR *file)
+{
+    BOOL use_both = FALSE, strip = FALSE;
+    WCHAR tmp[MAX_PATH];
+
+    TRACE("%p, %s, %s\n", dst, wine_dbgstr_w(dir), wine_dbgstr_w(file));
+
+    /* Invalid parameters */
+    if (!dst)
+        return NULL;
+
+    if (!dir && !file)
+    {
+        dst[0] = 0;
+        return NULL;
+    }
+
+    if ((!file || !*file) && dir)
+    {
+        /* Use dir only */
+        lstrcpynW(tmp, dir, ARRAY_SIZE(tmp));
+    }
+    else if (!dir || !*dir || !PathIsRelativeW(file))
+    {
+        if (!dir || !*dir || *file != '\\' || PathIsUNCW(file))
+        {
+            /* Use file only */
+            lstrcpynW(tmp, file, ARRAY_SIZE(tmp));
+        }
+        else
+        {
+            use_both = TRUE;
+            strip = TRUE;
+        }
+    }
+    else
+        use_both = TRUE;
+
+    if (use_both)
+    {
+        lstrcpynW(tmp, dir, ARRAY_SIZE(tmp));
+        if (strip)
+        {
+            PathStripToRootW(tmp);
+            file++; /* Skip '\' */
+        }
+
+        if (!PathAddBackslashW(tmp) || lstrlenW(tmp) + lstrlenW(file) >= MAX_PATH)
+        {
+            dst[0] = 0;
+            return NULL;
+        }
+
+        lstrcatW(tmp, file);
+    }
+
+```
+
+[RAGSnippet score=1.0] activeds/pathname.c::path_QueryInterface
+```c
+}
+
+static HRESULT WINAPI path_QueryInterface(IADsPathname *iface, REFIID riid, void **obj)
+{
+    TRACE("%p,%s,%p\n", iface, debugstr_guid(riid), obj);
+
+    if (!riid || !obj) return E_INVALIDARG;
+
+    if (IsEqualGUID(riid, &IID_IUnknown) ||
+        IsEqualGUID(riid, &IID_IDispatch) ||
+        IsEqualGUID(riid, &IID_IADsPathname))
+    {
+        IADsPathname_AddRef(iface);
+        *obj = iface;
+        return S_OK;
+    }
+
+    FIXME("interface %s is not implemented\n", debugstr_guid(riid));
+    return E_NOINTERFACE;
+}
+
+```
+
+[RAGSnippet score=1.0] activeds/pathname.c::path_AddRef
+```c
+static ULONG WINAPI path_AddRef(IADsPathname *iface)
+{
+    ADsPathname *path = impl_from_IADsPathname(iface);
+    return InterlockedIncrement(&path->ref);
+}
+
+```

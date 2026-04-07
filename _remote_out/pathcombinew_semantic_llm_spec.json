@@ -1,0 +1,68 @@
+{
+  "target_function": "PathCombineW",
+  "dependencies": [
+    {
+      "function": "ARRAY_SIZE",
+      "strategy": "No-op",
+      "reasoning": "ARRAY_SIZE is a macro used to determine the size of an array, it does not affect program logic.",
+      "stub_code": "#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))",
+      "name": "ARRAY_SIZE"
+    },
+    {
+      "function": "PathAddBackslashW",
+      "strategy": "Semantic_Binding",
+      "reasoning": "PathAddBackslashW is used to modify the path by adding a backslash if necessary. Its return value is critical for decision-making in the function.",
+      "stub_code": "BOOL WINAPI PathAddBackslashW(WCHAR *path) {\n  int ret = klee_make_symbolic_int(\"oda_PathAddBackslashW_ret\");\n  klee_assume(ret == 0 || ret == 1);\n  klee_assume(path != NULL);\n  if (ret) {\n    klee_assume(path[wcslen(path)] == '\\\\');\n  } else {\n    klee_assume(path[wcslen(path)] != '\\\\');\n  }\n  return ret;\n}",
+      "name": "PathAddBackslashW"
+    },
+    {
+      "function": "PathCanonicalizeW",
+      "strategy": "Semantic_Binding",
+      "reasoning": "PathCanonicalizeW is used to canonicalize the path and its return value is used to determine the success of the operation.",
+      "stub_code": "BOOL WINAPI PathCanonicalizeW(WCHAR *buffer, const WCHAR *path) {\n  int ret = klee_make_symbolic_int(\"oda_PathCanonicalizeW_ret\");\n  klee_assume(ret == 0 || ret == 1);\n  klee_assume(buffer != NULL);\n  klee_assume(path != NULL);\n  if (ret) {\n    klee_assume(wcslen(path) < MAX_PATH);\n  } else {\n    klee_assume(wcslen(path) >= MAX_PATH);\n  }\n  return ret;\n}",
+      "name": "PathCanonicalizeW"
+    },
+    {
+      "function": "PathIsRelativeW",
+      "strategy": "Semantic_Binding",
+      "reasoning": "PathIsRelativeW checks if the path is relative and its return value is used in conditional checks.",
+      "stub_code": "BOOL WINAPI PathIsRelativeW(const WCHAR *path) {\n  int ret = klee_make_symbolic_int(\"oda_PathIsRelativeW_ret\");\n  klee_assume(ret == 0 || ret == 1);\n  klee_assume(path != NULL);\n  if (ret) {\n    klee_assume(path[0] != '\\\\');\n  } else {\n    klee_assume(path[0] == '\\\\');\n  }\n  return ret;\n}",
+      "name": "PathIsRelativeW"
+    },
+    {
+      "function": "PathIsUNCW",
+      "strategy": "Semantic_Binding",
+      "reasoning": "PathIsUNCW checks if the path is a UNC path and its return value is crucial for decision-making.",
+      "stub_code": "BOOL WINAPI PathIsUNCW(const WCHAR *path) {\n  int ret = klee_make_symbolic_int(\"oda_PathIsUNCW_ret\");\n  klee_assume(ret == 0 || ret == 1);\n  klee_assume(path != NULL);\n  if (ret) {\n    klee_assume(path[0] == '\\\\' && path[1] == '\\\\');\n  } else {\n    klee_assume(!(path[0] == '\\\\' && path[1] == '\\\\'));\n  }\n  return ret;\n}",
+      "name": "PathIsUNCW"
+    },
+    {
+      "function": "PathStripToRootW",
+      "strategy": "No-op",
+      "reasoning": "PathStripToRootW modifies the path but does not return a value that affects logic flow.",
+      "stub_code": "BOOL WINAPI PathStripToRootW(WCHAR *path) {\n  if (path) {\n    path[0] = 0;\n  }\n  return TRUE;\n}",
+      "name": "PathStripToRootW"
+    },
+    {
+      "function": "lstrcatW",
+      "strategy": "Bounded_Concrete",
+      "reasoning": "lstrcatW is a string operation that concatenates two strings and should be implemented with a bounded length to prevent path explosion.",
+      "stub_code": "LPWSTR WINAPI lstrcatW(LPWSTR dst, LPCWSTR src) {\n  if (dst && src) {\n    for (int i = 0; i < 64 && *src; i++) {\n      dst[i] = *src;\n      src++;\n    }\n    dst[64 - 1] = '\\0';\n  }\n  return dst;\n}",
+      "name": "lstrcatW"
+    },
+    {
+      "function": "KERNELBASE_lstrcpynW",
+      "strategy": "Bounded_Concrete",
+      "reasoning": "KERNELBASE_lstrcpynW is a string copy function that should also be implemented with a bounded length.",
+      "stub_code": "LPWSTR WINAPI KERNELBASE_lstrcpynW(LPWSTR dst, LPCWSTR src, INT n) {\n  if (dst && src) {\n    for (int i = 0; i < n && *src; i++) {\n      dst[i] = *src;\n      src++;\n    }\n    dst[n - 1] = '\\0';\n  }\n  return dst;\n}",
+      "name": "KERNELBASE_lstrcpynW"
+    },
+    {
+      "function": "lstrlenW",
+      "strategy": "Bounded_Concrete",
+      "reasoning": "lstrlenW calculates the length of a string and should be implemented with a maximum length to avoid path explosion.",
+      "stub_code": "int WINAPI lstrlenW(LPCWSTR str) {\n  int len = 0;\n  if (str) {\n    while (len < 64 && str[len]) {\n      len++;\n    }\n  }\n  return len;\n}",
+      "name": "lstrlenW"
+    }
+  ]
+}
